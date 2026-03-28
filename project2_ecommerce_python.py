@@ -1230,7 +1230,7 @@ print(f"\n📈 AVERAGE MONTHLY GROWTH RATE: {growth_rates.mean()*100:.2f}%")
 #Revenue Forecasting for the next quarter
 # Project next 3 months based on trend
 df_clean['InvoiceDate'] = pd.to_datetime(df_clean['InvoiceDate'])
-monthly_sales = df_clean.resample('M', on='InvoiceDate')['TotalPrice'].sum()
+monthly_sales = df_clean.resample('ME', on='InvoiceDate')['TotalPrice'].sum()
 moving_avg = monthly_sales.rolling(window=3).mean()
 
 #Autoregressive, Integrated and Moving Average each of order 1
@@ -1272,7 +1272,7 @@ fig10.add_scatter(
 fig10.show()
 
 #Sales Trend Projection
-monthly_sales = df_clean.resample('M', on='InvoiceDate')['TotalPrice'].sum()
+monthly_sales = df_clean.resample('ME', on='InvoiceDate')['TotalPrice'].sum()
 moving_avg = monthly_sales.rolling(window=3).mean()
 growth_rate = monthly_sales.pct_change().mean()
 print(f"\nAverage Monthly Growth Rate: {growth_rate*100:.2f}%")

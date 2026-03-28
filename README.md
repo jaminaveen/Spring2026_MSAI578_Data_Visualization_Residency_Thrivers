@@ -135,12 +135,8 @@ The primary goal of this project is to apply data visualization techniques to ex
     - `returns` (returns/cancellations)  
 
 - **TODO 6 — Outlier Handling**  
-  → Removed:
-    - Zero-price transactions  
-    - Administrative/non-product rows  
-  → Flagged extreme values:
-    - Price (`IsPriceOutlier`)  
-    - Quantity (`IsQtyOutlier`)  
+Removed: Zero-price transactions
+Flagged extreme values: Price (`IsPriceOutlier`), Quantity (`IsQtyOutlier`)  
 
 ---
 

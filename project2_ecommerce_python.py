@@ -450,6 +450,7 @@ fig2b.write_html(os.path.join(OUTPUT_DIR, "analysis2_top_products_revenue.html")
 
 print("✓ Analysis 2 complete")
 
+
 # ==============================================================================
 # ANALYSIS 3: CUSTOMER BEHAVIOR
 # ==============================================================================
@@ -474,7 +475,6 @@ fig3a = px.histogram(
     labels={'value': 'Number of Purchases', 'count': 'Number of Customers'}
 )
 fig3a.update_layout(height=500)
-fig3a.show()
 fig3a.write_html(os.path.join(OUTPUT_DIR, "analysis3_purchase_frequency.html"))
 
 # Customer Lifetime Value (CLV)
@@ -489,8 +489,132 @@ print(customer_clv.head(10))
 # - Customer retention analysis
 
 
+# Use only registered customers and positive transactions for customer-specific analyses
+customer_df = df_clean[(df_clean['IsGuest'] == 0) & (df_clean['Quantity'] > 0)].copy()
+
+# - Customer segmentation (RFM analysis)
+
+snapshot_date = customer_df['InvoiceDate'].max() + pd.Timedelta(days=1)
+
+rfm = (
+    customer_df.groupby('CustomerID')
+    .agg({
+        'InvoiceDate': lambda x: (snapshot_date - x.max()).days,
+        'InvoiceNo': 'nunique',
+        'TotalPrice': 'sum'
+    })
+    .reset_index()
+)
+
+rfm.columns = ['CustomerID', 'Recency', 'Frequency', 'Monetary']
+
+rfm['R_Score'] = pd.qcut(rfm['Recency'].rank(method='first'), 4, labels=[4, 3, 2, 1]).astype(int)
+rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4]).astype(int)
+rfm['M_Score'] = pd.qcut(rfm['Monetary'].rank(method='first'), 4, labels=[1, 2, 3, 4]).astype(int)
+
+def segment_customer(row):
+    if row['R_Score'] >= 3 and row['F_Score'] >= 3 and row['M_Score'] >= 3:
+        return 'Champions'
+    elif row['R_Score'] >= 3 and row['F_Score'] >= 2:
+        return 'Loyal Customers'
+    elif row['R_Score'] == 4 and row['F_Score'] == 1:
+        return 'New Customers'
+    elif row['R_Score'] <= 2 and row['F_Score'] >= 3:
+        return 'At Risk'
+    elif row['R_Score'] <= 2 and row['F_Score'] <= 2:
+        return 'Lost'
+    else:
+        return 'Potential Loyalists'
+
+rfm['Segment'] = rfm.apply(segment_customer, axis=1)
+segment_counts = rfm['Segment'].value_counts()
+
+print(f"\n🎯 CUSTOMER SEGMENTS:")
+print(segment_counts)
+
+fig3b = px.bar(
+    x=segment_counts.index,
+    y=segment_counts.values,
+    title='Customer Segmentation (RFM)',
+    labels={'x': 'Segment', 'y': 'Number of Customers'},
+    color=segment_counts.values,
+    color_continuous_scale='Viridis'
+)
+fig3b.update_layout(height=500, showlegend=False)
+fig3b.write_html(os.path.join(OUTPUT_DIR, "analysis3_rfm_segments.html"))
+
+# - New vs returning customer trends
+customer_first_purchase = customer_df.groupby('CustomerID')['InvoiceDate'].min().dt.to_period('M')
+new_customers_by_month = customer_first_purchase.value_counts().sort_index()
+new_customers_by_month.name = 'NewCustomers'
+
+monthly_customer_activity = (
+    customer_df.assign(YearMonth=customer_df['InvoiceDate'].dt.to_period('M'))
+    .groupby('YearMonth')['CustomerID']
+    .nunique()
+)
+monthly_customer_activity.name = 'ActiveCustomers'
+
+customer_trend = pd.concat(
+    [new_customers_by_month, monthly_customer_activity],
+    axis=1
+).fillna(0)
+
+customer_trend['ReturningCustomers'] = (
+    customer_trend['ActiveCustomers'] - customer_trend['NewCustomers']
+).clip(lower=0)
+
+customer_trend = customer_trend.rename_axis('YearMonth').reset_index()
+customer_trend['YearMonth'] = customer_trend['YearMonth'].astype(str)
+
+fig3c = go.Figure()
+fig3c.add_trace(go.Bar(
+    x=customer_trend['YearMonth'],
+    y=customer_trend['NewCustomers'],
+    name='New Customers'
+))
+fig3c.add_trace(go.Bar(
+    x=customer_trend['YearMonth'],
+    y=customer_trend['ReturningCustomers'],
+    name='Returning Customers'
+))
+fig3c.update_layout(
+    barmode='stack',
+    title='New vs Returning Customers by Month',
+    xaxis_title='Month',
+    yaxis_title='Number of Customers',
+    height=500
+)
+fig3c.write_html(os.path.join(OUTPUT_DIR, "analysis3_new_vs_returning.html"))
+
+# - Customer retention analysis
+
+retention_summary = pd.DataFrame({
+    'CustomerID': customer_df.groupby('CustomerID')['InvoiceNo'].nunique().index,
+    'PurchaseCount': customer_df.groupby('CustomerID')['InvoiceNo'].nunique().values
+})
+
+retention_summary['Retained'] = np.where(
+    retention_summary['PurchaseCount'] > 1,
+    'Repeat',
+    'One-Time'
+)
+
+retention_counts = retention_summary['Retained'].value_counts()
+
+print(f"\n🔁 CUSTOMER RETENTION SUMMARY:")
+print(retention_counts)
+
+fig3d = px.pie(
+    names=retention_counts.index,
+    values=retention_counts.values,
+    title='One-Time vs Repeat Customers'
+)
+fig3d.update_layout(height=500)
+fig3d.write_html(os.path.join(OUTPUT_DIR, "analysis3_retention_summary.html"))
 
 print("✓ Analysis 3 complete")
+
 
 # ==============================================================================
 # ANALYSIS 4: GEOGRAPHIC ANALYSIS
@@ -808,6 +932,7 @@ print(f"  Return Rate (value) : {abs(gross_ret)/gross_sales*100:.2f}% of gross s
 
 print("✓ Analysis 8 complete")
 
+
 # ==============================================================================
 # ANALYSIS 9: COHORT ANALYSIS
 # ==============================================================================
@@ -823,11 +948,97 @@ print("="*70)
 # 3. Calculate retention rates
 # 4. Visualize cohort behavior over time
 
-# Starter code:
-# first_purchase = df_clean.groupby('CustomerID')['InvoiceDate'].min()
-# ...
 
-print("⚠️ TODO: Complete cohort analysis")
+# Use only registered customers and completed sales
+cohort_df = df_clean[(df_clean['IsGuest'] == 0) & (df_clean['Quantity'] > 0)].copy()
+
+# Convert transaction date to month
+cohort_df['InvoiceMonth'] = cohort_df['InvoiceDate'].dt.to_period('M').dt.to_timestamp()
+
+# Find first purchase month for each customer
+first_purchase = (
+    cohort_df.groupby('CustomerID', as_index=False)['InvoiceMonth']
+    .min()
+    .rename(columns={'InvoiceMonth': 'CohortMonth'})
+)
+
+# Attach cohort month to each transaction
+cohort_df = cohort_df.merge(first_purchase, on='CustomerID', how='left')
+
+# Calculate months since first purchase
+cohort_df['CohortIndex'] = (
+    (cohort_df['InvoiceMonth'].dt.year - cohort_df['CohortMonth'].dt.year) * 12
+    + (cohort_df['InvoiceMonth'].dt.month - cohort_df['CohortMonth'].dt.month)
+)
+
+# Build cohort count matrix
+cohort_counts = (
+    cohort_df.groupby(['CohortMonth', 'CohortIndex'])['CustomerID']
+    .nunique()
+    .unstack(fill_value=0)
+)
+
+# Build retention matrix
+retention = cohort_counts.divide(cohort_counts[0], axis=0) * 100
+retention = retention.round(1)
+
+# Format cohort labels
+cohort_counts.index = cohort_counts.index.strftime('%Y-%m')
+retention.index = retention.index.strftime('%Y-%m')
+
+# Hide future months with no available data
+retention_display = retention.where(cohort_counts > 0)
+
+print("\n👥 COHORT CUSTOMER COUNTS:")
+print(cohort_counts)
+
+print("\n📈 COHORT RETENTION RATES (%):")
+print(retention_display)
+
+# Save retention table
+retention_display.to_csv("cohort_retention.csv")
+
+# Static heatmap for report / presentation
+plt.figure(figsize=(14, 8))
+sns.heatmap(retention_display, annot=True, fmt=".1f", cmap="Blues")
+plt.title("Customer Cohort Retention Rate (%)")
+plt.xlabel("Months Since First Purchase")
+plt.ylabel("Cohort Month")
+plt.tight_layout()
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "analysis9_cohort_retention.png"),
+    dpi=300,
+    bbox_inches='tight'
+)
+plt.close()
+
+# Interactive heatmap for dashboard
+fig9 = px.imshow(
+    retention_display,
+    text_auto=True,
+    aspect="auto",
+    color_continuous_scale="Blues",
+    labels={
+        "x": "Months Since First Purchase",
+        "y": "Cohort Month",
+        "color": "Retention %"
+    },
+    title="Customer Cohort Retention Rate (%)"
+)
+
+fig9.update_layout(
+    height=600,
+    font=dict(family="Arial", size=12)
+)
+fig9.update_xaxes(title="Months Since First Purchase", tickmode="linear")
+fig9.update_yaxes(title="Cohort Month")
+
+fig9.write_html(os.path.join(OUTPUT_DIR, "analysis9_cohort_retention.html"))
+
+print("✓ Saved cohort_retention.csv")
+print("✓ Saved outputs/analysis9_cohort_retention.png")
+print("✓ Saved outputs/analysis9_cohort_retention.html")
+print("✓ Analysis 9 complete")
 
 # ==============================================================================
 # ANALYSIS 10: FORECASTING & PREDICTIONS

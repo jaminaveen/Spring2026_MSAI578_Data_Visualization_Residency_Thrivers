@@ -57,7 +57,7 @@ COLORS = {
 print("="*70)
 print(" "*20 + "E-COMMERCE ANALYTICS PROJECT")
 print("="*70)
-print(f"Team: [YOUR TEAM NAME]")
+print(f"Team: Thrivers")
 print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print("="*70)
 

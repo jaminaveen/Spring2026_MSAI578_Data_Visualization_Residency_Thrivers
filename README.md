@@ -96,6 +96,11 @@ The primary goal of this project is to apply data visualization techniques to ex
 - **`df_clean`**  
   Full cleaned dataset *(all transactions, including returns)*  
 
+
+- **`customer_specific_analyses_data`**  
+  Filtered for (CustomerID != 'Guest')
+  → Use for **Customer specific analysis for customer behavior, CLV, cohorts**  
+
 - **`sales`**  
   Positive transactions only  
   → Use for **revenue, product, and customer analyses**  
@@ -138,13 +143,6 @@ The primary goal of this project is to apply data visualization techniques to ex
 Removed: Zero-price transactions
 Flagged extreme values: Price (`IsPriceOutlier`), Quantity (`IsQtyOutlier`)  
 
----
-
-## Final Dataset Sizes
-
-- **df_clean:** 534,129 rows × 23 columns  
-- **sales:** 524,878 rows  
-- **returns:** 9,251 rows  
 
 ---
 

@@ -34,6 +34,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+from statsmodels.tsa.arima.model import ARIMA
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -521,10 +522,94 @@ fig4a.update_layout(height=600, showlegend=False)
 fig4a.show()
 fig4a.write_html(os.path.join(OUTPUT_DIR, "analysis4_country_revenue.html"))
 
-# TODO: Create geographic map visualization
+# ── TODO: Create geographic map visualization ──────────────────────────────────────
 # Hint: Use plotly choropleth or scatter_geo
+country_map_df = country_revenue.reset_index()
+country_map_df.columns = ['Country', 'Revenue']
 
+fig4b = px.choropleth(
+    country_map_df,
+    locations='Country',
+    locationmode='country names',
+    color='Revenue',
+    title='Revenue by Country',
+    color_continuous_scale='Viridis',
+    labels={'Revenue': 'Total Revenue ($)'}
+)
 
+fig4b.update_layout(
+    geo=dict(showframe=False, showcoastlines=True),
+    height=600
+)
+
+fig4b.show()
+
+#Sales By Country
+country_summary = df_clean.groupby('Country').agg(
+    TotalRevenue=('TotalPrice', 'sum'),
+    TotalSales=('InvoiceNo', 'nunique'),
+    TotalQuantity=('Quantity', 'sum')
+).sort_values('TotalRevenue', ascending=False)
+
+print("\n🌍 SALES BY COUNTRY (TOP 10)")
+print(country_summary.head(10))
+
+#Revenue Distribution across regions
+def assign_region(country):
+    if country in ['United Kingdom']:
+        return 'Domestic (UK)'
+    elif country in ['Germany', 'France', 'Spain', 'Netherlands', 'Belgium', 'Italy']:
+        return 'Europe'
+    elif country in ['USA', 'Canada']:
+        return 'North America'
+    elif country in ['Australia']:
+        return 'Oceania'
+    else:
+        return 'Rest of World'
+
+df_clean['Region'] = df_clean['Country'].apply(assign_region)
+
+region_summary = df_clean.groupby('Region')['TotalPrice'].sum().sort_values(ascending=False)
+
+print("\nREVENUE BY REGION")
+print(region_summary)
+
+#Top 5 countries by revenue
+top5_countries = country_summary['TotalRevenue'].head(5)
+
+print("\nTOP 5 COUNTRIES BY REVENUE:")
+for i, (country, value) in enumerate(top5_countries.items(), 1):
+    print(f"{i}. {country}: ${value:,.2f}")
+
+#Geographic Expansion Opportunities
+country_summary['AvgOrderValue'] = (
+    country_summary['TotalRevenue'] / country_summary['TotalSales']
+)
+
+opportunity = country_summary.sort_values(
+    by=['TotalSales', 'AvgOrderValue'],
+    ascending=[False, True]
+)
+
+print("\nTOP EXPANSION OPPORTUNITIES (HIGH ACTIVITY, LOWER VALUE)")
+print(opportunity.head(10))
+
+#International/Domestic Sales Comparison
+domestic_vs_international = df_clean.copy()
+
+domestic_vs_international['MarketType'] = domestic_vs_international['Country'].apply(
+    lambda x: 'Domestic (UK)' if x == 'United Kingdom' else 'International'
+)
+
+market_summary = domestic_vs_international.groupby('MarketType')['TotalPrice'].sum()
+
+print("\nDOMESTIC VS INTERNATIONAL SALES")
+print(market_summary)
+
+# percentage split
+market_share = market_summary / market_summary.sum() * 100
+print("\nMARKET SHARE (%)")
+print(market_share.round(2))
 
 print("✓ Analysis 4 complete")
 
@@ -567,11 +652,94 @@ fig5b.update_layout(height=500)
 fig5b.show()
 fig5b.write_html(os.path.join(OUTPUT_DIR, "analysis5_hour_of_day.html"))
 
-# TODO: Additional time analyses
+# ── TODO: Additional time analyses ──────────────────────────────────────
 # - Monthly seasonality
-# - Weekend vs weekday
-# - Holiday effects (if you identify holidays)
+month_revenue = df_clean.groupby('MonthName')['TotalPrice'].sum()
+moy_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+month_revenue = month_revenue.reindex(moy_order)
 
+fig5c = px.line(
+    x=month_revenue.index,
+    y=month_revenue.values,
+    title='Revenue by Month of Year',
+    labels={'x': 'MonthName', 'y': 'Revenue ($)'},
+    markers=True
+)
+fig5c.update_layout(height=500)
+fig5c.show()
+
+# - Weekend vs weekday
+df_clean['DayType'] = df_clean['DayOfWeek'].apply(
+    lambda x: 'Weekend' if x in ['Saturday', 'Sunday'] else 'Weekday'
+)
+daytype_revenue = df_clean.groupby('DayType')['TotalPrice'].sum().sort_values(ascending=False)
+
+fig5d = px.bar(
+    x=daytype_revenue.index,
+    y=daytype_revenue.values,
+    title="Revenue: Weekend vs Weekday",
+    labels={'x': 'Day Type', 'y': 'Revenue ($)'},
+    color=daytype_revenue.values
+)
+fig5d.show()
+
+# - Holiday effects (if you identify holidays)
+holiday_months = ['November', 'December']
+
+df_clean['SeasonType'] = df_clean['MonthName'].apply(
+    lambda x: 'Holiday Season' if x in holiday_months else 'Non-Holiday Season'
+)
+season_revenue = df_clean.groupby('SeasonType')['TotalPrice'].sum()
+
+fig5e = px.bar(
+    x=season_revenue.index,
+    y=season_revenue.values,
+    title="Holiday Season vs Non-Holiday Revenue",
+    labels={'x': 'Season', 'y': 'Revenue ($)'},
+    color=season_revenue.values,
+    color_continuous_scale='Viridis'
+)
+
+fig5e.show()
+
+#Sales by day of week
+day_sales = df_clean.groupby('DayOfWeek')['TotalPrice'].sum()
+
+print("\nSales by day of week")
+print(day_sales.sort_values(ascending=False))
+
+#Sale by Hour of day
+hour_sales = df_clean.groupby('Hour')['TotalPrice'].sum()
+
+print("\nSales by Hour of day")
+print(hour_sales.sort_values(ascending=False))
+
+#Monthly Seasonality
+month_sales = df_clean.groupby('MonthName')['TotalPrice'].sum().reindex(moy_order)
+
+print("\nMonthly Seasonality")
+print(month_sales)
+
+#Holiday/weekend effects
+holiday_effect = df_clean.groupby('SeasonType')['TotalPrice'].sum()
+weekend_effect = df_clean.groupby('DayType')['TotalPrice'].sum()
+
+print("\nWeekend vs Weekday Effect")
+print(weekend_effect)
+print("\nHoliday vs Non-Holiday Season Effect")
+print(holiday_effect)
+
+#Best Times for Promotions
+best_hours = hour_sales.sort_values(ascending=False).head(3)
+best_days = day_sales.sort_values(ascending=False).head(3)
+
+print("\nBEST TIMES FOR PROMOTIONS")
+
+print("\nTop 3 Hours:")
+print(best_hours)
+
+print("\nTop 3 Days:")
+print(best_days)
 
 
 print("✓ Analysis 5 complete")
@@ -847,10 +1015,107 @@ growth_rates = revenue_by_month.pct_change()
 
 print(f"\n📈 AVERAGE MONTHLY GROWTH RATE: {growth_rates.mean()*100:.2f}%")
 
-# TODO: Create forecast visualization
+# ── TODO: Create forecast visualization ──────────────────────────────────────────
+#Revenue Forecasting for the next quarter
 # Project next 3 months based on trend
+df_clean['InvoiceDate'] = pd.to_datetime(df_clean['InvoiceDate'])
+monthly_sales = df_clean.resample('M', on='InvoiceDate')['TotalPrice'].sum()
+moving_avg = monthly_sales.rolling(window=3).mean()
+
+#Autoregressive, Integrated and Moving Average each of order 1
+model = ARIMA(monthly_sales, order=(1,1,1))
+model_fit = model.fit()
+future = model_fit.forecast(steps=3)
+# Create future dates
+future_index = pd.date_range(
+    start=monthly_sales.index[-1] + pd.offsets.MonthBegin(1),
+    periods=3,
+    freq='MS'
+)
+
+future_series = pd.Series(future.values, index=future_index)
+fig10 = px.line(title="Monthly Revenue + Forecast Projection")
+
+# Actual
+fig10.add_scatter(
+    x=monthly_sales.index,
+    y=monthly_sales.values,
+    name="Actual Revenue"
+)
+
+# Moving average trend
+fig10.add_scatter(
+    x=monthly_sales.index,
+    y=moving_avg.values,
+    name="3-Month Moving Avg"
+)
+
+# ARIMA forecast
+fig10.add_scatter(
+    x=future_series.index,
+    y=future_series.values,
+    name="ARIMA Forecast",
+    line=dict(dash="dash")
+)
+
+fig10.show()
+
+#Sales Trend Projection
+monthly_sales = df_clean.resample('M', on='InvoiceDate')['TotalPrice'].sum()
+moving_avg = monthly_sales.rolling(window=3).mean()
+growth_rate = monthly_sales.pct_change().mean()
+print(f"\nAverage Monthly Growth Rate: {growth_rate*100:.2f}%")
+print('\033[1m' + 'Future_Date  Forecasted_TotalPrice' + '\033[0m')
+print(future_series)
+
+#Identify Growth Opportunities
+# Country-level opportunity
+country_metrics = df_clean.groupby('Country').agg(
+    Revenue=('TotalPrice', 'sum'),
+    Orders=('InvoiceNo', 'nunique'),
+    Quantity=('Quantity', 'sum')
+)
+
+country_metrics['RevenuePerOrder'] = (
+    country_metrics['Revenue'] / country_metrics['Orders']
+)
+
+growth_opportunities = country_metrics.sort_values(
+    ['Orders', 'RevenuePerOrder'],
+    ascending=[False, True]
+)
+
+print("\nTop Growth Opportunities (High Volume, Low Value):")
+print(growth_opportunities.head(10))
+
+# Product opportunity
+product_opportunities = df_clean.groupby('Description').agg(
+    Revenue=('TotalPrice', 'sum'),
+    Quantity=('Quantity', 'sum')
+).sort_values('Quantity', ascending=False)
+
+print("\nTop Product Scaling Opportunities:")
+print(product_opportunities.head(10))
 
 
+#Risk areas identification
+# Revenue concentration risk
+country_share = country_metrics['Revenue'] / country_metrics['Revenue'].sum()
+
+print("\nTop Revenue Dependency Countries:")
+print(country_share.sort_values(ascending=False).head(5))
+
+# Return risk
+returns = df_clean[df_clean['Quantity'] < 0]['Revenue'].sum() if 'Revenue' in df_clean else 0
+total_revenue = df_clean['TotalPrice'].sum()
+
+print("\nReturn / Cancellation Risk (%):")
+print((returns / total_revenue) * 100)
+
+# Zero-price anomaly
+if 'UnitPrice' in df_clean.columns:
+    zero_price = (df_clean['UnitPrice'] == 0).sum()
+    print("\nZero Price Transactions:", zero_price)
 
 print("✓ Analysis 10 complete")
 

@@ -86,3 +86,79 @@ The primary goal of this project is to apply data visualization techniques to ex
 - **Environment:** Jupyter Notebook  
 
 ---
+
+# Data Engineer Handoff — Team Reference
+
+---
+
+## 📁 Datasets Available to All Analysts
+
+- **`df_clean`**  
+  Full cleaned dataset *(all transactions, including returns)*  
+
+- **`sales`**  
+  Positive transactions only  
+  → Use for **revenue, product, and customer analyses**  
+
+- **`returns`**  
+  Returns and cancellations  
+  → Use for **return behavior analysis (Analysis 8)**  
+
+---
+
+## Column Reference (PascalCase)
+
+### Original Columns
+- `InvoiceNo`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`  
+- `UnitPrice`, `CustomerID`, `Country`  
+
+### Engineered Columns
+- `TotalPrice`, `Year`, `Month`, `MonthName`, `Day`, `DayOfWeek`  
+- `Hour`, `Date`, `YearMonth`, `Quarter`  
+
+### Flags
+- `IsGuest`, `IsReturn`, `IsCancellation`, `IsPriceOutlier`, `IsQtyOutlier`  
+
+---
+
+## Data Cleaning Decisions
+
+- **TODO 4 — CustomerID Handling**  
+  → Option B + C  
+  → Missing values filled with `"Guest"`  
+  → Flag added: `IsGuest = 1`  
+
+- **TODO 5 — Negative Quantity Handling**  
+  → Option B  
+  → Created separate datasets:  
+    - `sales` (valid purchases)  
+    - `returns` (returns/cancellations)  
+
+- **TODO 6 — Outlier Handling**  
+  → Removed:
+    - Zero-price transactions  
+    - Administrative/non-product rows  
+  → Flagged extreme values:
+    - Price (`IsPriceOutlier`)  
+    - Quantity (`IsQtyOutlier`)  
+
+---
+
+## Final Dataset Sizes
+
+- **df_clean:** 534,129 rows × 23 columns  
+- **sales:** 524,878 rows  
+- **returns:** 9,251 rows  
+
+---
+
+## Other Notes
+- Naming convention: **PascalCase** for consistency with starter code  
+- Datasets are ready for downstream analysis and visualization  
+- Supports:
+  - Time-series analysis  
+  - Customer segmentation  
+  - Product analytics  
+  - Return behavior analysis  
+
+---

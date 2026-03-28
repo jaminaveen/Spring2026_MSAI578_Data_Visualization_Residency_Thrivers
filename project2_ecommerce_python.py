@@ -311,7 +311,7 @@ fig1.write_html(os.path.join(OUTPUT_DIR, "analysis1_monthly_revenue.html"))
 # - Growth rate calculation
 # - Seasonal patterns
 print("-" * 50)
-print("TODO: Add trend visualizations")
+print("[Charts open in your browser]Weekly revenue trend")
 print("-" * 50)
 # ── TODO: Weekly revenue trend ───────────────────────────────────────────────
 weekly_revenue = sales.groupby(sales['InvoiceDate'].dt.to_period('W'))['TotalPrice'].sum()
@@ -331,6 +331,9 @@ fig1b.show()
 fig1b.write_html(os.path.join(OUTPUT_DIR, "analysis1_weekly_revenue.html"))
 
 # ── TODO: Growth rate calculation ────────────────────────────────────────────
+print("-" * 50)
+print("[Charts open in your browser]Growth rate calculation")
+print("-" * 50)
 monthly_revenue_s = sales.groupby(sales['InvoiceDate'].dt.to_period('M'))['TotalPrice'].sum()
 monthly_df = monthly_revenue_s.reset_index()
 monthly_df.columns = ['YearMonth', 'Revenue']
@@ -359,6 +362,9 @@ fig1c.show()
 fig1c.write_html(os.path.join(OUTPUT_DIR, "analysis1_growth_rate.html"))
 
 # ── TODO: Seasonal patterns (quarterly) ──────────────────────────────────────
+print("-" * 50)
+print("[Charts open in your browser]Seasonal patterns (quarterly)")
+print("-" * 50)
 # .rename() gives each groupby key a distinct name so reset_index() doesn't conflict
 seasonal = (
     sales.groupby([
@@ -692,7 +698,112 @@ if len(returns) > 0:
 # TODO: Additional return analyses
 # - Return patterns over time
 # - Countries with highest return rates
+# ── TODO: Return rate by product ─────────────────────────────────────────────
+print("-" * 50)
+print("[Charts open in your browser]Return rate by product")
+print("-" * 50)
+sold_by_product = (sales.groupby(['StockCode','Description'])
+                   .agg(qty_sold=('Quantity','sum')).reset_index())
+ret_by_product  = (returns.groupby('StockCode')
+                   .agg(qty_returned=('Quantity','sum')).reset_index())
+ret_by_product['qty_returned_abs'] = ret_by_product['qty_returned'].abs()
 
+product_returns = sold_by_product.merge(
+    ret_by_product[['StockCode','qty_returned_abs']], on='StockCode', how='left'
+).fillna(0)
+product_returns['ReturnRate_Pct'] = (
+    product_returns['qty_returned_abs'] / product_returns['qty_sold'] * 100
+).clip(upper=100).round(2)
+product_returns = product_returns.sort_values('ReturnRate_Pct', ascending=False)
+
+fig8b = px.bar(
+    product_returns.head(15),
+    x='ReturnRate_Pct', y='Description', orientation='h',
+    color='ReturnRate_Pct', color_continuous_scale='Reds',
+    title='Top 15 Products by Return Rate (%)',
+    labels={'ReturnRate_Pct': 'Return Rate (%)', 'Description': 'Product'},
+    text='ReturnRate_Pct'
+)
+fig8b.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+fig8b.update_layout(yaxis={'categoryorder':'total ascending'}, height=520,
+                    coloraxis_showscale=False)
+fig8b.show()
+fig8b.write_html(os.path.join(OUTPUT_DIR, "analysis8_return_rate_by_product.html"))
+
+# ── TODO: Return patterns over time ──────────────────────────────────────────
+print("-" * 50)
+print("[Charts open in your browser]Return patterns over time")
+print("-" * 50)
+ret_monthly = (returns.groupby(returns['InvoiceDate'].dt.to_period('M'))
+               .agg(n_returns=('InvoiceNo','count'), return_value=('TotalPrice','sum'))
+               .reset_index())
+ret_monthly.columns = ['YearMonth', 'n_returns', 'return_value']
+ret_monthly['YearMonth_str']    = ret_monthly['YearMonth'].astype(str)
+ret_monthly['return_value_abs'] = ret_monthly['return_value'].abs()
+
+monthly_sales_val = (sales.groupby(sales['InvoiceDate'].dt.to_period('M'))['TotalPrice']
+                     .sum().reset_index())
+monthly_sales_val.columns = ['YearMonth', 'sales_revenue']
+monthly_sales_val['YearMonth_str'] = monthly_sales_val['YearMonth'].astype(str)
+
+ret_vs_sales = ret_monthly.merge(
+    monthly_sales_val[['YearMonth_str','sales_revenue']], on='YearMonth_str', how='left'
+)
+ret_vs_sales['pct_of_sales'] = (
+    ret_vs_sales['return_value_abs'] / ret_vs_sales['sales_revenue'] * 100
+).round(2)
+
+fig8c = make_subplots(specs=[[{"secondary_y": True}]])
+fig8c.add_trace(go.Bar(x=ret_vs_sales['YearMonth_str'], y=ret_vs_sales['return_value_abs'],
+                       name='Return Value ($)', marker_color=COLORS['danger'], opacity=0.8),
+                secondary_y=False)
+fig8c.add_trace(go.Scatter(x=ret_vs_sales['YearMonth_str'], y=ret_vs_sales['pct_of_sales'],
+                           name='Returns as % of Sales', mode='lines+markers',
+                           line=dict(color=COLORS['secondary'], width=2)),
+                secondary_y=True)
+fig8c.update_layout(title='Monthly Return Value & Returns as % of Sales',
+                    xaxis_title='Month', height=470)
+fig8c.update_yaxes(title_text='Return Value ($)', secondary_y=False)
+fig8c.update_yaxes(title_text='% of Sales Revenue', secondary_y=True)
+fig8c.show()
+fig8c.write_html(os.path.join(OUTPUT_DIR, "analysis8_returns_over_time.html"))
+
+# ── TODO: Countries with highest return rates ────────────────────────────────
+print("-" * 50)
+print("[Charts open in your browser]Countries with highest return rates")
+print("-" * 50)
+country_sales   = sales.groupby('Country')['Quantity'].sum().rename('qty_sold')
+country_returns = returns.groupby('Country')['Quantity'].sum().abs().rename('qty_returned')
+country_ret_rate = pd.concat([country_sales, country_returns], axis=1).fillna(0)
+country_ret_rate['ReturnRate_Pct'] = (
+    country_ret_rate['qty_returned'] / country_ret_rate['qty_sold'] * 100
+).clip(upper=100).round(2)
+country_ret_rate = (country_ret_rate.reset_index()
+                    .sort_values('ReturnRate_Pct', ascending=False).head(15))
+
+fig8d = px.bar(
+    country_ret_rate, x='ReturnRate_Pct', y='Country', orientation='h',
+    color='ReturnRate_Pct', color_continuous_scale='Oranges',
+    title='Countries with Highest Return Rates (%)',
+    labels={'ReturnRate_Pct': 'Return Rate (%)', 'Country': ''},
+    text='ReturnRate_Pct'
+)
+fig8d.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+fig8d.update_layout(yaxis={'categoryorder':'total ascending'}, height=480,
+                    coloraxis_showscale=False)
+fig8d.show()
+fig8d.write_html(os.path.join(OUTPUT_DIR, "analysis8_returns_by_country.html"))
+
+# ── Financial impact summary ──────────────────────────────────────────────────
+gross_sales = sales['TotalPrice'].sum()
+gross_ret   = returns['TotalPrice'].sum()
+net_rev     = gross_sales + gross_ret
+
+print(f"\n Summary ofFINANCIAL IMPACT OF RETURNS:")
+print(f"  Gross Sales Revenue : ${gross_sales:>12,.2f}")
+print(f"  Gross Return Value  : ${gross_ret:>12,.2f}")
+print(f"  Net Revenue         : ${net_rev:>12,.2f}")
+print(f"  Return Rate (value) : {abs(gross_ret)/gross_sales*100:.2f}% of gross sales")
 
 
 print("✓ Analysis 8 complete")

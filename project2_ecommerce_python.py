@@ -1221,7 +1221,7 @@ print("="*70)
 # Can use simple trend line or more advanced methods
 
 # Example: Calculate growth rate
-revenue_by_month = df_clean.groupby(df_clean['InvoiceDate'].dt.to_period('M'))['TotalPrice'].sum()
+revenue_by_month = df_clean.groupby(df_clean['InvoiceDate'].dt.to_period('ME'))['TotalPrice'].sum()
 growth_rates = revenue_by_month.pct_change()
 
 print(f"\n📈 AVERAGE MONTHLY GROWTH RATE: {growth_rates.mean()*100:.2f}%")

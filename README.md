@@ -1,158 +1,186 @@
-# E-Commerce Business Analytics Project
-
-## Course Information
-- **Class:** Spring 2026 - MSAI 578 - M70 - Data Visualization  
-- **Instructor:** Dr. Deya Banisakher  
-- **Group Name:** Thrivers  
+# E-Commerce Business Analytics
+**MSAI 578 — Data Visualization | Spring 2026 | Dr. Deya Banisakher**
+**Team: Thrivers**
 
 ---
 
-## Project Title
-**E-Commerce Business Analytics**
+## Team Members & Roles
+
+| Name | Role |
+|------|------|
+| Naveen Jami | Data Engineer |
+| Vikranth Reddy Gurram | Analyst 1 |
+| Yiming Liu | Analyst 2 |
+| Shishir Khanal | Visualization Specialist |
+| Chiranjeevi Pinapati | Communications Lead |
+
+---
+
+## Reproducing This Project
+
+### Requirements
+- **Python:** 3.13.9
+- **OS:** macOS / Linux / Windows
+
+### Setup
+
+```bash
+# 1. Create a virtual environment using Python 3.13.9
+python3.13 -m venv .venv
+
+# 2. Activate it
+source .venv/bin/activate          # macOS / Linux
+.venv\Scripts\activate             # Windows
+
+# 3. Install all dependencies
+pip install -r requirements.txt
+
+# 4. Run the full analysis script
+python project2_ecommerce_python.py
+```
+
+> **Dataset required:** Place `Online Retail.xlsx` inside the `data/` folder before running.
+> Download from: https://archive.ics.uci.edu/ml/datasets/Online+Retail
+
+All HTML figures are written automatically to the `outputs/` folder on first run.
+
+---
+
+## Project Files
+
+```
+.
+├── data/
+│   ├── Online Retail.xlsx               # source dataset (required)
+│   └── E-COMMERCE DATA DICTIONARY.pdf
+├── outputs/                             # all HTML/PNG figures (auto-created)
+├── project2_ecommerce_python.py         # main analysis script (all 10 analyses)
+├── thrivers_ecommerce_analytics.ipynb   # Data Engineer notebook (Analysis 1 & 8)
+├── requirements.txt
+├── project_summary.csv                  # auto-generated KPI summary
+├── cohort_retention.csv                 # cohort retention matrix
+└── README.md
+```
 
 ---
 
 ## Dataset Overview
 
-### Primary Dataset: E-Commerce Transactions
+| Attribute | Value |
+|-----------|-------|
+| Source | UCI Machine Learning Repository |
+| File | `data/Online Retail.xlsx` |
+| Raw rows | 541,909 |
+| Columns | 8 |
+| Period | December 2010 – December 2011 |
+| Geography | UK-primary; 38 countries total |
 
-- **Source:** UCI Machine Learning Repository / Kaggle  
-- **Dataset Name:** Online Retail Dataset  
+**Columns:** `InvoiceNo`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`, `UnitPrice`, `CustomerID`, `Country`
 
-### Description
-This dataset contains transactional data from a UK-based online retail company. It captures detailed information about customer purchases, including products, quantities, pricing, and geographic location. The dataset is widely used for analyzing customer behavior, sales trends, and business performance in e-commerce environments.
-
----
-
-## Dataset Details
-
-- **Size:** ~540,000 transactions  
-- **Time Period:** December 2010 – December 2011  
-- **Geographical Scope:** Primarily United Kingdom, with some international transactions  
-- **Data Type:** Transactional (Retail/E-Commerce)
+Each row is one product line within an invoice. A single invoice may span multiple rows.
 
 ---
 
-## Dataset Attributes
+## Data Engineering Decisions
 
-The dataset contains the following key fields:
+### TODO 4 — Missing CustomerID (135,080 rows = 24.9%)
+**Decision: Option B + C** — Keep rows, fill with `"Guest"`, add `IsGuest` flag.
+- Guest transactions are real revenue; removing them understates total sales.
+- `IsGuest=1` flag lets analysts filter them out for identity-dependent analyses (Analysis 3, 9).
 
-- **Invoice Number:** Unique identifier for each transaction  
-- **Stock Code (Product ID):** Unique code assigned to each product  
-- **Description (Product Name):** Name of the product purchased  
-- **Quantity Sold:** Number of units purchased per transaction  
-- **Invoice Date/Time:** Timestamp of when the transaction occurred  
-- **Unit Price:** Price per unit of the product  
-- **Customer ID:** Unique identifier for each customer  
-- **Country:** Country where the customer is located  
+### TODO 5 — Negative Quantities / Cancellations (10,624 rows)
+**Decision: Option B** — Create separate `sales` and `returns` sub-datasets.
+- `sales` (530,104 rows): positive transactions only — use for revenue/product/customer work.
+- `returns` (9,288 rows): C-prefix invoices and negative-quantity rows — use for Analysis 8.
+- Removing them entirely (Option A) would eliminate the signal needed for return analysis.
+
+### TODO 6 — Outliers
+| Action | Detail |
+|--------|--------|
+| Removed | 2,517 rows with `UnitPrice ≤ 0` (non-product adjustments) |
+| Removed | Administrative `StockCode` rows (`POST`, `DOT`, `BANK CHARGES`, etc.) |
+| Flagged, kept | 540 extreme price outliers (`UnitPrice > £206.39`) → `IsPriceOutlier` |
+| Flagged, kept | 474 extreme quantity outliers (`|Qty| > 480`) → `IsQtyOutlier` |
+
+**Final cleaned dataset:** 539,392 rows × 21 columns
+
+### Engineered Columns
+
+| Column | Description |
+|--------|-------------|
+| `TotalPrice` | `Quantity × UnitPrice` |
+| `Year`, `Month`, `MonthName`, `Day` | Date components |
+| `DayOfWeek`, `Hour`, `Date` | Time components |
+| `YearMonth`, `Quarter` | Aggregation periods |
+| `IsGuest` | 1 = no CustomerID on record |
+| `IsReturn` | 1 = negative Quantity |
+| `IsCancellation` | 1 = InvoiceNo starts with 'C' |
+| `IsPriceOutlier` | 1 = UnitPrice > 99.9th percentile |
+| `IsQtyOutlier` | 1 = \|Quantity\| > 99.9th percentile |
+
+### Dataset Reference for Analysts
+
+| DataFrame | Use for |
+|-----------|---------|
+| `df_clean` | All transactions including returns |
+| `sales` | Revenue, product performance, basket, time-pattern analyses |
+| `returns` | Analysis 8 — returns & cancellations |
+| `df_clean[df_clean['IsGuest']==0]` | Customer behavior, CLV, cohort analyses (Analysis 3, 9) |
 
 ---
 
-## Data Characteristics
+## Key Metrics
 
-- The dataset is **transaction-level**, where each row represents a single product within an invoice.  
-- A single invoice may include multiple rows (i.e., multiple products in one purchase).  
-- The data supports multiple analytical perspectives, including:
-  - Time-series analysis (sales trends, seasonality)  
-  - Customer behavior analysis  
-  - Product performance evaluation  
-  - Geographic sales distribution  
+| Metric | Value |
+|--------|-------|
+| Total Revenue (net) | £9,769,872 |
+| Gross Sales Revenue | £10,666,685 |
+| Return Financial Impact | £896,812 (8.41% of gross) |
+| Total Invoices | 23,796 |
+| Unique Registered Customers | 4,372 |
+| Unique Products | 4,070 |
+| Countries Served | 38 |
+| Average Order Value | £410.57 |
+| Avg Month-over-Month Growth | 2.9% |
+| Peak Revenue Month | November 2011 — £1,509,496 |
+| Peak Sales Day | Thursday |
+| Peak Sales Hour | 10:00 |
+| Repeat Customer Rate | 70% |
+| UK Market Share | 84.0% of revenue |
+| ARIMA Forecast (Q1 2012) | ~£2.84M |
 
 ---
 
-## Dataset Link
-- https://archive.ics.uci.edu/ml/datasets/Online+Retail
+## Analyses Produced
+
+| # | Analysis | Lead | Outputs |
+|---|----------|------|---------|
+| 1 | Sales Overview & Trends | Data Engineer | `analysis1_monthly_revenue.html`, `analysis1_weekly_revenue.html`, `analysis1_growth_rate.html`, `analysis1_seasonal.html` |
+| 2 | Product Performance | Analyst 1 | `analysis2_top_products_quantity.html`, `analysis2_top_products_revenue.html` |
+| 3 | Customer Behavior (RFM) | Analyst 1 | `analysis3_purchase_frequency.html` |
+| 4 | Geographic Analysis | Analyst 2 | `analysis4_country_revenue.html` |
+| 5 | Time-Based Patterns | Analyst 2 | `analysis5_day_of_week.html`, `analysis5_hour_of_day.html` |
+| 6 | Basket Analysis | Visualization Specialist | `analysis6_basket_distribution.html` |
+| 7 | Pricing Analysis | Visualization Specialist | `analysis7_price_distribution.html`, `analysis7_price_ranges.html` |
+| 8 | Returns & Cancellations | Data Engineer | `analysis8_top_returns.html`, `analysis8_return_rate_by_product.html`, `analysis8_returns_over_time.html`, `analysis8_returns_by_country.html` |
+| 9 | Cohort Analysis | Analyst 1 | `analysis9_cohort_retention.html`, `analysis9_cohort_retention.png` |
+| 10 | Forecasting & Predictions | All | `analysis10_forecast.html` |
+| — | Executive Dashboard | Visualization Specialist | `executive_dashboard.html` |
 
 ---
 
-## Project Objectives
+## Key Findings
 
-The primary goal of this project is to apply data visualization techniques to extract meaningful business insights from e-commerce data.
-
-### Key Objectives:
-- Analyze customer purchasing behavior  
-- Identify trends and seasonal patterns in sales  
-- Evaluate product-level performance and revenue contribution  
-- Explore geographic distribution of customers and sales  
-- Generate actionable insights to support business decision-making  
+- **Revenue peak:** November 2011 drove £1.5M — Q4 overall is the strongest quarter. Q1/Q2 are softer by ~25–30%.
+- **Returns:** £897K (8.41% of gross) lost to returns. Return rate by transaction row is 1.72%.
+- **Geography:** UK accounts for 84% of revenue. Netherlands, EIRE, and Germany are the top international markets.
+- **Customer health:** 70% repeat rate, but the largest RFM segment is "Lost" (1,514 customers) — a retention opportunity.
+- **Trading pattern:** Peak hours are 10:00–12:00 Thursday–Tuesday. Saturday has near-zero sales, consistent with B2B wholesale.
+- **Forecast:** ARIMA projects ~£2.84M for Q1 2012, consistent with prior-year Q1 seasonality.
 
 ---
 
 ## Tools & Technologies
 
-- **Programming:** Python  
-- **Libraries:** Pandas, NumPy  
-- **Visualization:** Matplotlib, Seaborn, Plotly  
-- **Environment:** Jupyter Notebook  
-
----
-
-# Data Engineer Handoff — Team Reference
-
----
-
-## 📁 Datasets Available to All Analysts
-
-- **`df_clean`**  
-  Full cleaned dataset *(all transactions, including returns)*  
-
-
-- **`customer_specific_analyses_data`**  
-  Filtered for (CustomerID != 'Guest')
-  → Use for **Customer specific analysis for customer behavior, CLV, cohorts**  
-
-- **`sales`**  
-  Positive transactions only  
-  → Use for **revenue, product, and customer analyses**  
-
-- **`returns`**  
-  Returns and cancellations  
-  → Use for **return behavior analysis (Analysis 8)**  
-
----
-
-## Column Reference (PascalCase)
-
-### Original Columns
-- `InvoiceNo`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`  
-- `UnitPrice`, `CustomerID`, `Country`  
-
-### Engineered Columns
-- `TotalPrice`, `Year`, `Month`, `MonthName`, `Day`, `DayOfWeek`  
-- `Hour`, `Date`, `YearMonth`, `Quarter`  
-
-### Flags
-- `IsGuest`, `IsReturn`, `IsCancellation`, `IsPriceOutlier`, `IsQtyOutlier`  
-
----
-
-## Data Cleaning Decisions
-
-- **TODO 4 — CustomerID Handling**  
-  → Option B + C  
-  → Missing values filled with `"Guest"`  
-  → Flag added: `IsGuest = 1`  
-
-- **TODO 5 — Negative Quantity Handling**  
-  → Option B  
-  → Created separate datasets:  
-    - `sales` (valid purchases)  
-    - `returns` (returns/cancellations)  
-
-- **TODO 6 — Outlier Handling**  
-Removed: Zero-price transactions
-Flagged extreme values: Price (`IsPriceOutlier`), Quantity (`IsQtyOutlier`)  
-
-
----
-
-## Other Notes
-- Naming convention: **PascalCase** for consistency with starter code  
-- Datasets are ready for downstream analysis and visualization  
-- Supports:
-  - Time-series analysis  
-  - Customer segmentation  
-  - Product analytics  
-  - Return behavior analysis  
-
----
+- **Python:** 3.13.9
+- **Libraries:** pandas 3.0.1, numpy 2.4.3, plotly 6.6.0, matplotlib 3.10.8, seaborn 0.13.2, scipy 1.17.1, statsmodels 0.14.6, openpyxl 3.1.5

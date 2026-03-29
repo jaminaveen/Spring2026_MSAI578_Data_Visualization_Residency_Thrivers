@@ -448,7 +448,97 @@ fig2b.write_html(os.path.join(OUTPUT_DIR, "analysis2_top_products_revenue.html")
 # - Product category analysis (if you create categories)
 
 
+product_stats = df_clean.groupby('Description').agg(
+    Total_Volume=('Quantity', 'sum'),
+    Total_Revenue=('TotalPrice', 'sum')
+).reset_index()
 
+product_stats['Average_Price'] = product_stats['Total_Revenue'] / product_stats['Total_Volume']
+
+print(product_stats.head(10))
+
+fig2c = px.scatter(
+    product_stats,
+    x='Total_Volume',           # Requirement 1: x-axis
+    y='Average_Price',          # Requirement 2: y-axis
+    color='Description',        # Requirement 3: Color by categorical variable
+    log_x=True,
+    log_y=True,
+    title='Average Price vs Sales Volume',
+    labels={
+        'Total_Volumes': 'Total_Volume (Log Scale)',
+        'Average_Price': 'Average_Price (Log Scale)'
+    },
+    opacity=0.7,                           # Adding some transparency to handle overlapping points
+    template='plotly_white'                # Clean background
+)
+
+# Display the plot
+fig2c.show()
+
+# Save as 'Average_Price_vs_Sales_Volume.html'
+fig2c.write_html(os.path.join(OUTPUT_DIR, "analysis2_Average_Price_vs_Sales_Volume.html"))
+
+# As shown in the scatter plot above (log scale), there is an inverse relationship between 
+# price and sales volume. Lower-priced items generally drive the vast 
+# majority of the volume. Products priced above $10 see an apparent drop-off in quantities sold.
+
+# Bottom 10 products by revenue
+pos_products_rev = product_stats[product_stats['Total_Revenue'] > 0]
+
+underperforming_10_products = pos_products_rev.sort_values(by='Total_Revenue').head(10)
+
+print(underperforming_10_products)
+
+fig2d = px.bar(
+    underperforming_10_products,
+    x='Description',
+    y='Total_Revenue',
+    title='Underperforming 10 Products by positive Revenue',
+    labels={'x': 'Description', 'y': 'Total_Revenue'},
+    color='Total_Revenue',
+    color_continuous_scale='Greens'
+)
+fig2d.update_layout(height=500, showlegend=False)
+fig2d.show()
+fig2d.write_html(os.path.join(OUTPUT_DIR, "analysis2_underperforming_products_revenue.html"))
+# this shows 10 lowest positive total revenue by different products
+
+# I extracted some common descriptive keywords from the Description column to group the items,
+# Product category analysis, I created the following categories
+keywords = ['BAG', 'BOX', 'MUG', 'HEART', 'GLASS', 'PAPER', 'BOTTLE', 'CANDLE', 'SIGN', 'CARD', 'WRAP', 'NECKLACE', 'BRACELET', 'CLOCK']
+
+def get_category(desc):
+    desc_upper = str(desc).upper()
+    for kw in keywords:
+        if kw in desc_upper:
+            return kw
+    return 'OTHER'
+
+df_clean['Category'] = df_clean['Description'].apply(get_category)
+
+category_stats = df_clean.groupby('Category').agg(
+    Total_Volume=('Quantity', 'sum'),
+    Total_Revenue=('TotalPrice', 'sum')
+).reset_index()
+
+category_stats_sorted = category_stats[category_stats['Category'] != 'OTHER'].sort_values('Total_Revenue', ascending=False)
+category_stats_sorted
+
+fig2e = px.bar(
+    category_stats_sorted,
+    x='Category',
+    y='Total_Revenue',
+    title='Revenue by Product category',
+    labels={'x': 'Category', 'y': 'Total_Revenue'},
+    color='Total_Revenue',
+    color_continuous_scale='Greens'
+)
+fig2e.update_layout(height=500, showlegend=False)
+fig2e.show()
+fig2e.write_html(os.path.join(OUTPUT_DIR, "analysis2_revenue_by_category.html"))
+# bar chart above shows the total revenue comparison across these newly created categories. 
+# "BAG", and "HEART" products outperform others, indicating a strong customer preference for BAG and products with "HEART" pettern.
 print("✓ Analysis 2 complete")
 
 
@@ -899,10 +989,119 @@ fig6.write_html(os.path.join(OUTPUT_DIR, "analysis6_basket_distribution.html"))
 
 # TODO: Additional basket analyses
 # - Large vs small basket patterns
+# approximately linear relationship between basket size and basket value
+# I divided all transactions (invoices) into three equal segments (tertiles) based on 
+# basket_size (total quantity of items): Small (Bottom 33%), Medium (Middle 33%), and Large (Top 33%).
+# The distribution is highly skewed. While Small and Medium baskets make up 33% of the transactions for each, 
+# the Large Baskets generate massively disproportionate value. A large basket is exceptionally larger in volume and in value than a small basket. The scatter plot (first image) visually confirms this long-tail behavior on a logarithmic scale.
+
+basket_date = df_clean.groupby('InvoiceNo')['Date'].min()
+# Combine into a single DataFrame
+basket_df = pd.DataFrame({
+    'basket_size': basket_size,
+    'basket_value': basket_value,
+    'basket_items': basket_items,
+    'Date': basket_date
+}).reset_index()
+
+basket_df['Basket_Category'] = pd.qcut(basket_df['basket_size'], q=[0, 0.33, 0.66, 1.0], labels=['Small', 'Medium', 'Large'])
+
+fig6b = px.scatter(
+    basket_df,
+    x='basket_size',
+    y='basket_value',
+    color='Basket_Category',
+    opacity=0.5,           # Adding transparency to see overlapping points
+    log_x=True,            # Logarithmic scale for X
+    log_y=True,            # Logarithmic scale for Y
+    title='Basket Value vs. Basket Size (Log Scale)',
+    labels={
+        'basket_size': 'Basket Size (Total Quantity)',
+        'basket_value': 'Basket Value (Total Price)',
+        'Basket_Category': 'Category'
+    },
+)
+
+fig6b.show()
+
+fig6b.write_html(os.path.join(OUTPUT_DIR, "analysis6_Large_medium_small_basket.html"))
+
+
 # - Basket size trends over time
+# Time Trend Aggregation
+# I aggregated the data in month to see if the average basket size and total value per transaction evolved over 2010 and 2011.
+# The average basket size saw a spike in January 2011
+# Throughout the spring and early summer (April - June 2011), basket sizes decrease
+# and then the average volume and value climbed back up from July through September
+# this dual trends show that Avg Basket Size and Avg Basket Value closely mirror one another throughout the year
 
+basket_df['Date'] = pd.to_datetime(basket_df['Date'])
+basket_df['YearMonth'] = basket_df['Date'].dt.to_period('M').astype(str)
+trend_df = basket_df.groupby('YearMonth').mean(numeric_only=True).reset_index()
+print(trend_df.head(10))
 
+# Since YearMonth is a period object in pandas, convert it to a string for Plotly
+trend_df['YearMonth_Str'] = trend_df['YearMonth'].astype(str)
 
+# 1. Initialize the figure with a secondary y-axis
+fig6c = make_subplots(specs=[[{"secondary_y": True}]])
+
+# 2. Add the first line: Average Basket Size (Primary Y-Axis)
+fig6c.add_trace(
+    go.Scatter(
+        x=trend_df['YearMonth_Str'],
+        y=trend_df['basket_size'],
+        name="Avg Basket Size",
+        mode='lines+markers',
+        line=dict(color='blue', width=2),
+        marker=dict(symbol='circle', size=8)
+    ),
+    secondary_y=False, # Assigns to the left axis
+)
+
+# 3. Add the second line: Average Basket Value (Secondary Y-Axis)
+fig6c.add_trace(
+    go.Scatter(
+        x=trend_df['YearMonth_Str'],
+        y=trend_df['basket_value'],
+        name="Avg Basket Value",
+        mode='lines+markers',
+        line=dict(color='green', width=2, dash='dash'), # Dashed line
+        marker=dict(symbol='square', size=8)
+    ),
+    secondary_y=True, # Assigns to the right axis
+)
+
+# 4. Update titles and formatting
+fig6c.update_layout(
+    title_text="Basket Size & Value Trends Over Time",
+    xaxis_title="Month",
+    hovermode="x unified", # Shows data for both lines in a single tooltip on hover
+    plot_bgcolor='white',
+    legend=dict(x=0.02, y=0.98) # Positions the legend neatly inside the chart
+)
+
+# Configure the primary Y-axis (Left)
+fig6c.update_yaxes(
+    title_text="Average Basket Size (Quantity)", 
+    secondary_y=False, 
+    title_font=dict(color="blue"),
+    tickfont=dict(color="blue"),
+    showgrid=True, gridcolor='lightgrey', griddash='dot'
+)
+
+# Configure the secondary Y-axis (Right)
+fig6c.update_yaxes(
+    title_text="Average Basket Value ($)", 
+    secondary_y=True, 
+    title_font=dict(color="green"),
+    tickfont=dict(color="green"),
+    tickformat="$.2f" # Formats ticks as currency
+)
+
+fig6c.show()
+
+fig6c.write_html(os.path.join(OUTPUT_DIR, "analysis6_basket_size_value_trend.html"))
 print("✓ Analysis 6 complete")
 
 # ==============================================================================
@@ -946,9 +1145,101 @@ fig7b.write_html(os.path.join(OUTPUT_DIR, "analysis7_price_ranges.html"))
 
 # TODO: Additional pricing analyses
 # - Price elasticity insights
+# I use StockCode = 85123A as an example
+# Filter for our target highly elastic item
+# we need to observe how historical changes in a product's price affected the quantity sold.
+# I fitted a logarithmic demand curve to calculate the exact elasticity for it
+# Calculated Elasticity: -5.44 (Highly Elastic), meaning 
+# For every 1% increase in price, demand for this item drops by roughly 5.44%.
+
+from scipy import stats
+
+target_item = '85123A' 
+item_data = df_clean[df_clean['StockCode'] == target_item]
+
+# Aggregate demand by price point
+demand = item_data.groupby('UnitPrice').agg(
+    Total_Quantity=('Quantity', 'sum'),
+    Transactions=('InvoiceNo', 'nunique')
+).reset_index()
+
+# Filter out noise (price points with less than 10 transactions)
+demand = demand[demand['Transactions'] >= 10]
+demand['Total_Revenue'] = demand['UnitPrice'] * demand['Total_Quantity']
+
+# Calculate log-log regression for the trendline
+slope, intercept, r_value, p_value, std_err = stats.linregress(np.log(demand['UnitPrice']), np.log(demand['Total_Quantity']))
+
+# Generate points for the smooth trendline
+x_trend = np.linspace(demand['UnitPrice'].min(), demand['UnitPrice'].max(), 50)
+y_trend = np.exp(intercept + slope * np.log(x_trend))
+
+fig7c = go.Figure()
+
+# Add the actual data points
+fig7c.add_trace(go.Scatter(
+    x=demand['UnitPrice'], 
+    y=demand['Total_Quantity'],
+    mode='markers',
+    marker=dict(size=12, color='blue'),
+    name='Actual Sales'
+))
+
+# Add the regression fit line
+fig7c.add_trace(go.Scatter(
+    x=x_trend, 
+    y=y_trend,
+    mode='lines',
+    line=dict(dash='dash', color='red'),
+    name=f'Demand Fit (Elasticity: {slope:.2f})'
+))
+
+fig7c.update_layout(
+    title='Demand Curve: WHITE HANGING HEART T-LIGHT HOLDER',
+    xaxis_title='Unit Price ($)',
+    yaxis_title='Total Quantity Sold',
+    height=500,
+    hovermode="x unified"
+)
+
+fig7c.show()
+
+fig7c.write_html(os.path.join(OUTPUT_DIR, "analysis7_demand_curve.html"))
+
 # - Optimal price points
+# Based on the Revenue Curve, For highly elastic items like the "White Hanging Heart T-Light Holder", 
+# the lowest tested price point (~$2.55) generated about 50% more revenue than the next tier up ($2.95)
+# Pricing this item near $6.00 kills demand almost entirely.
+fig7d = px.scatter(
+    demand,
+    x='UnitPrice',
+    y='Total_Revenue',
+    size='Total_Quantity', 
+    title='Revenue Optimization Curve: WHITE HANGING HEART T-LIGHT HOLDER',
+    labels={'UnitPrice': 'Unit Price ($)', 'Total_Revenue': 'Total Revenue ($)'},
+    color='Total_Revenue',
+    color_continuous_scale='Greens'
+)
 
+# Add line connecting the dots to show the curve shape clearly
+fig7d.add_trace(go.Scatter(
+    x=demand['UnitPrice'],
+    y=demand['Total_Revenue'],
+    mode='lines',
+    line=dict(color='green', width=2, dash='dot'),
+    showlegend=False
+))
 
+fig7d.update_traces(marker=dict(sizemin=10), selector=dict(mode='markers'))
+
+# Adding a slight Y-axis padding ensures the bottom points don't get cut off by the axis line
+fig7d.update_yaxes(rangemode="tozero") 
+
+fig7d.update_layout(height=500)
+
+fig7d.show()
+
+fig7d.write_html(os.path.join(OUTPUT_DIR, "analysis7_revenue_curve.html"))
 
 print("✓ Analysis 7 complete")
 

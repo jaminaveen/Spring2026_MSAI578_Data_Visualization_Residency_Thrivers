@@ -1355,6 +1355,273 @@ summary_df.to_csv("project_summary.csv", index=False)
 print("\n✓ Summary statistics saved to project_summary.csv")
 
 # ==============================================================================
+# EXECUTIVE DASHBOARD — 3×3 SUBPLOT SUMMARY
+# ==============================================================================
+
+print("\n" + "="*70)
+print(" "*18 + "EXECUTIVE DASHBOARD (3×3 SUBPLOT)")
+print("="*70)
+
+# ── Prepare the 9 data slices ──────────────────
+
+# [1,1] Monthly revenue trend — from Analysis 1
+#   monthly_revenue  (Series, datetime index, values = revenue)
+
+# [1,2] Top 10 products by revenue — from Analysis 2
+#   top_products_rev  (Series, index = description, values = revenue)
+top10_rev   = top_products_rev.head(10).sort_values()          # ascending for h-bar
+
+# [1,3] Top 10 countries by revenue EXCLUDING UK — from Analysis 4
+#   country_revenue  (Series, sorted descending)
+country_ex_uk = country_revenue.drop('United Kingdom', errors='ignore').head(10).sort_values()
+
+# [2,1] Revenue by day of week — from Analysis 5
+#   dow_revenue  (Series, reindexed Mon→Sun)
+
+# [2,2] RFM customer segments — from Analysis 3
+#   segment_counts  (Series, index = segment name, values = count)
+
+# [2,3] Repeat vs one-time customers — from Analysis 3
+#   retention_counts  (Series, index = ['Repeat','One-Time'], values = count)
+
+# [3,1] Revenue by price range — from Analysis 7
+#   price_range_revenue  (Series, index = PriceRange categories)
+
+# [3,2] Top 10 returned products — from Analysis 8
+#   top_returned  (Series, index = description, values = negative qty)
+top10_ret = top_returned.head(10)                              
+
+# [3,3] ARIMA forecast — from Analysis 10
+#   monthly_sales   (actual revenue Series)
+#   future_series   (3-month forecast Series)
+
+# ── Build the subplot figure ──────────────────────────────────────────────────
+
+fig_exec = make_subplots(
+    rows=3, cols=3,
+    subplot_titles=(
+        "Monthly Revenue Trend",
+        "Top 10 Products by Revenue",
+        "Top 10 Countries (ex-UK) by Revenue",
+        "Revenue by Day of Week",
+        "Customer Segments (RFM)",
+        "Repeat vs One-Time Customers",
+        "Revenue by Price Range",
+        "Top 10 Most Returned Products",
+        "Revenue Forecast (ARIMA +3 months)",
+    ),
+    specs=[
+        [{"type": "xy"},     {"type": "xy"},     {"type": "xy"}],
+        [{"type": "xy"},     {"type": "xy"},     {"type": "domain"}],  # (2,3) = pie
+        [{"type": "xy"},     {"type": "xy"},     {"type": "xy"}],
+    ],
+    vertical_spacing=0.12,
+    horizontal_spacing=0.08,
+)
+
+# ── Row 1 ─────────────────────────────────────────────────────────────────────
+
+# [1,1] Monthly revenue line
+fig_exec.add_trace(
+    go.Scatter(
+        x=monthly_revenue.index,
+        y=monthly_revenue.values,
+        mode="lines+markers",
+        name="Monthly Revenue",
+        line=dict(color=COLORS['primary'], width=2),
+        marker=dict(size=5),
+        showlegend=False,
+    ),
+    row=1, col=1,
+)
+
+# [1,2] Top 10 products by revenue — horizontal bar
+fig_exec.add_trace(
+    go.Bar(
+        x=top10_rev.values,
+        y=[d[:30] + "…" if len(d) > 30 else d for d in top10_rev.index],
+        orientation="h",
+        name="Revenue",
+        marker_color=COLORS['success'],
+        showlegend=False,
+    ),
+    row=1, col=2,
+)
+
+# [1,3] Top countries ex-UK — horizontal bar
+fig_exec.add_trace(
+    go.Bar(
+        x=country_ex_uk.values,
+        y=country_ex_uk.index,
+        orientation="h",
+        name="Country Revenue",
+        marker_color=COLORS['info'],
+        showlegend=False,
+    ),
+    row=1, col=3,
+)
+
+# ── Row 2 ─────────────────────────────────────────────────────────────────────
+
+# [2,1] Revenue by day of week
+fig_exec.add_trace(
+    go.Bar(
+        x=dow_revenue.index,
+        y=dow_revenue.values,
+        name="DoW Revenue",
+        marker_color=COLORS['secondary'],
+        showlegend=False,
+    ),
+    row=2, col=1,
+)
+
+# [2,2] RFM segments
+fig_exec.add_trace(
+    go.Bar(
+        x=segment_counts.index,
+        y=segment_counts.values,
+        name="Segments",
+        marker_color=COLORS['primary'],
+        showlegend=False,
+    ),
+    row=2, col=2,
+)
+
+# [2,3] Repeat vs one-time — pie
+fig_exec.add_trace(
+    go.Pie(
+        labels=retention_counts.index,
+        values=retention_counts.values,
+        name="Retention",
+        hole=0.35,                         # donut style
+        marker_colors=[COLORS['success'], COLORS['danger']],
+        showlegend=True,
+        legendgroup="retention",
+    ),
+    row=2, col=3,
+)
+
+# ── Row 3 ─────────────────────────────────────────────────────────────────────
+
+# [3,1] Revenue by price range
+fig_exec.add_trace(
+    go.Bar(
+        x=price_range_revenue.index.astype(str),
+        y=price_range_revenue.values,
+        name="Price Range",
+        marker_color=COLORS['info'],
+        showlegend=False,
+    ),
+    row=3, col=1,
+)
+
+# [3,2] Top returned products — horizontal bar (absolute quantities)
+fig_exec.add_trace(
+    go.Bar(
+        x=abs(top10_ret.values),
+        y=[d[:30] + "…" if len(d) > 30 else d for d in top10_ret.index],
+        orientation="h",
+        name="Returns",
+        marker_color=COLORS['danger'],
+        showlegend=False,
+    ),
+    row=3, col=2,
+)
+
+# [3,3] Forecast — actual + ARIMA
+fig_exec.add_trace(
+    go.Scatter(
+        x=monthly_sales.index,
+        y=monthly_sales.values,
+        mode="lines",
+        name="Actual Revenue",
+        line=dict(color=COLORS['primary'], width=2),
+        showlegend=True,
+        legendgroup="forecast",
+    ),
+    row=3, col=3,
+)
+fig_exec.add_trace(
+    go.Scatter(
+        x=future_series.index,
+        y=future_series.values,
+        mode="lines+markers",
+        name="ARIMA Forecast",
+        line=dict(color=COLORS['danger'], width=2, dash="dash"),
+        marker=dict(size=7, symbol="diamond"),
+        showlegend=True,
+        legendgroup="forecast",
+    ),
+    row=3, col=3,
+)
+
+# ── Global layout ─────────────────────────────────────────────────────────────
+
+fig_exec.update_layout(
+    title=dict(
+        text=(
+            "<b>Thrivers — E-Commerce Executive Dashboard</b><br>"
+            "<sup>Dec 2010 – Dec 2011  |  UK Online Retail Dataset</sup>"
+        ),
+        x=0.5,
+        xanchor="center",
+        font=dict(size=20),
+    ),
+    height=1200,
+    width=1800,
+    paper_bgcolor="white",
+    plot_bgcolor="white",
+    font=dict(family="Arial", size=11),
+    margin=dict(t=120, b=60, l=60, r=60),
+)
+
+# Tidy up axis labels on a few panels
+fig_exec.update_xaxes(title_text="Month",          row=1, col=1, tickangle=-30)
+fig_exec.update_yaxes(title_text="Revenue ($)",    row=1, col=1)
+fig_exec.update_xaxes(title_text="Revenue ($)",    row=1, col=2)
+fig_exec.update_xaxes(title_text="Revenue ($)",    row=1, col=3)
+fig_exec.update_xaxes(title_text="Day",            row=2, col=1)
+fig_exec.update_yaxes(title_text="# Customers",    row=2, col=2)
+fig_exec.update_xaxes(title_text="Price Range",    row=3, col=1)
+fig_exec.update_xaxes(title_text="Qty Returned",   row=3, col=2)
+fig_exec.update_xaxes(title_text="Month",          row=3, col=3, tickangle=-30)
+fig_exec.update_yaxes(title_text="Revenue ($)",    row=3, col=3)
+
+
+exec_dashboard_path = os.path.join(OUTPUT_DIR, "executive_dashboard.html")
+fig_exec.write_html(exec_dashboard_path)
+fig_exec.show()
+
+print(f"✓ Executive dashboard saved → {exec_dashboard_path}")
+print("="*70)
+
+#Print Executuve Summary to console
+total_rev_m   = total_revenue / 1_000_000
+top_product   = top_products_rev.index[0]
+top_country   = country_ex_uk.index[-1]          # highest value in the ex-UK series
+top_segment   = segment_counts.index[0]
+repeat_pct    = retention_counts.get('Repeat', 0) / retention_counts.sum() * 100
+return_impact = abs(df_clean[df_clean['Quantity'] < 0]['TotalPrice'].sum())
+peak_price_range = price_range_revenue.idxmax()
+forecast_q    = future_series.sum() / 1_000
+
+print("""
+╔══════════════════════════════════════════════════════════════════════╗
+║              EXECUTIVE SUMMARY — THRIVERS ANALYTICS                  ║
+╚══════════════════════════════════════════════════════════════════════╝
+""")
+print(f"  Total Revenue (Dec 2010–Dec 2011) : £{total_rev_m:.2f}M")
+print(f"  Top Revenue Product               : {top_product[:50]}")
+print(f"  Largest International Market      : {top_country}")
+print(f"  Repeat Customer Rate              : {repeat_pct:.1f}%")
+print(f"  Largest Customer Segment (RFM)    : {top_segment}")
+print(f"  Highest-Revenue Price Band        : {peak_price_range}")
+print(f"  Return Financial Impact           : £{return_impact:,.0f}")
+print(f"  ARIMA Forecast — Next Quarter     : £{forecast_q:,.0f}K")
+print()
+
+
+# ==============================================================================
 # NEXT STEPS
 # ==============================================================================
 

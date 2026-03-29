@@ -306,6 +306,7 @@ fig1 = px.line(
 fig1.update_layout(height=500)
 fig1.show()
 fig1.write_html(os.path.join(OUTPUT_DIR, "analysis1_monthly_revenue.html"))
+fig1.write_image(os.path.join(OUTPUT_DIR, "analysis1_monthly_revenue.png"))
 
 # TODO: Add more trend visualizations
 # - Weekly trends
@@ -330,6 +331,7 @@ fig1b.update_layout(title='Weekly Revenue Trend (with 4-Week Moving Average)',
                     xaxis_title='Week', yaxis_title='Revenue ($)', height=480)
 fig1b.show()
 fig1b.write_html(os.path.join(OUTPUT_DIR, "analysis1_weekly_revenue.html"))
+fig1b.write_image(os.path.join(OUTPUT_DIR, "analysis1_weekly_revenue.png"))
 
 # ── TODO: Growth rate calculation ────────────────────────────────────────────
 print("-" * 50)
@@ -361,6 +363,7 @@ fig1c.update_yaxes(title_text='Revenue ($)', secondary_y=False)
 fig1c.update_yaxes(title_text='Growth Rate (%)', secondary_y=True)
 fig1c.show()
 fig1c.write_html(os.path.join(OUTPUT_DIR, "analysis1_growth_rate.html"))
+fig1c.write_image(os.path.join(OUTPUT_DIR, "analysis1_growth_rate.png"))
 
 # ── TODO: Seasonal patterns (quarterly) ──────────────────────────────────────
 print("-" * 50)
@@ -385,6 +388,7 @@ fig1d.update_traces(textposition='outside')
 fig1d.update_layout(height=450)
 fig1d.show()
 fig1d.write_html(os.path.join(OUTPUT_DIR, "analysis1_seasonal.html"))
+fig1d.write_image(os.path.join(OUTPUT_DIR, "analysis1_seasonal.png"))
 
 # ── Peak period identification ────────────────────────────────────────────────
 peak_month = monthly_df.loc[monthly_df['Revenue'].idxmax(), 'YearMonth_str']
@@ -1277,6 +1281,7 @@ if len(returns) > 0:
     fig8.update_layout(height=500, showlegend=False)
     fig8.show()
     fig8.write_html(os.path.join(OUTPUT_DIR, "analysis8_top_returns.html"))
+    fig8.write_image(os.path.join(OUTPUT_DIR, "analysis8_top_returns.png"))
 
 # TODO: Additional return analyses
 # - Return patterns over time
@@ -1312,6 +1317,7 @@ fig8b.update_layout(yaxis={'categoryorder':'total ascending'}, height=520,
                     coloraxis_showscale=False)
 fig8b.show()
 fig8b.write_html(os.path.join(OUTPUT_DIR, "analysis8_return_rate_by_product.html"))
+fig8b.write_image(os.path.join(OUTPUT_DIR, "analysis8_return_rate_by_product.png"))
 
 # ── TODO: Return patterns over time ──────────────────────────────────────────
 print("-" * 50)
@@ -1350,6 +1356,7 @@ fig8c.update_yaxes(title_text='Return Value ($)', secondary_y=False)
 fig8c.update_yaxes(title_text='% of Sales Revenue', secondary_y=True)
 fig8c.show()
 fig8c.write_html(os.path.join(OUTPUT_DIR, "analysis8_returns_over_time.html"))
+fig8c.write_image(os.path.join(OUTPUT_DIR, "analysis8_returns_over_time.png"))
 
 # ── TODO: Countries with highest return rates ────────────────────────────────
 print("-" * 50)
@@ -1376,6 +1383,7 @@ fig8d.update_layout(yaxis={'categoryorder':'total ascending'}, height=480,
                     coloraxis_showscale=False)
 fig8d.show()
 fig8d.write_html(os.path.join(OUTPUT_DIR, "analysis8_returns_by_country.html"))
+fig8d.write_image(os.path.join(OUTPUT_DIR, "analysis8_returns_by_country.png"))
 
 # ── Financial impact summary ──────────────────────────────────────────────────
 gross_sales = sales['TotalPrice'].sum()
@@ -1561,6 +1569,8 @@ fig10.add_scatter(
 )
 
 fig10.show()
+fig10.write_html(os.path.join(OUTPUT_DIR, "analysis10_revenue_forecast.html"))
+fig10.write_image(os.path.join(OUTPUT_DIR, "analysis10_revenue_forecast.png"))
 
 #Sales Trend Projection
 monthly_sales = df_clean.resample('ME', on='InvoiceDate')['TotalPrice'].sum()
